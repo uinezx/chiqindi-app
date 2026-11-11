@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chiqindi xabarnomasi</title>
+<style>
+  body { font-family: Arial, sans-serif; background: #f4f6f8; margin: 0; padding: 20px; color: #222; }
+  .container { max-width: 720px; margin: 0 auto; }
+  h1 { color: #1F3864; font-size: 24px; }
+  .card { background: #fff; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+  label { display: block; margin-top: 12px; font-weight: bold; font-size: 14px; }
+  input, select, textarea { width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+  button { margin-top: 16px; background: #1F3864; color: #fff; border: none; padding: 10px 18px; border-radius: 4px; cursor: pointer; font-size: 14px; }
+  button:hover { background: #2e4a80; }
+  .filter { margin-bottom: 12px; }
+  .report { border-left: 4px solid #ccc; padding: 12px; margin-bottom: 12px; background: #fafafa; border-radius: 4px; }
+  .report.yangi { border-color: #d9534f; }
+  .report.jarayonda { border-color: #f0ad4e; }
+  .report.hal { border-color: #5cb85c; }
+  .meta { font-size: 13px; color: #666; margin-top: 4px; }
+  .status-select { width: auto; margin-top: 8px; }
+  img.thumb { max-width: 160px; margin-top: 8px; border-radius: 4px; }
+  .empty { color: #888; font-style: italic; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Mahalla chiqindi xabarnomasi</h1>
+
+  <div class="card">
+    <h2 style="font-size:18px;margin-top:0;">Murojaat qoldirish</h2>
+    <form id="form">
+      <label for="address">Manzil</label>
+      <input type="text" id="address" placeholder="Masalan: Navoiy ko'chasi, 12-uy" required>
+
+      <label for="type">Chiqindi turi</label>
+      <select id="type">
+        <option>Maishiy chiqindi</option>
+        <option>Qurilish chiqindisi</option>
+        <option>Sinadigan chiqindi</option>
+        <option>Boshqa</option>
+      </select>
+
+      <label for="note">Izoh</label>
+      <textarea id="note" rows="3" placeholder="Qo'shimcha ma'lumot"></textarea>
+
+      <label for="photo">Rasm (ixtiyoriy)</label>
+      <input type="file" id="photo" accept="image/*">
+
+      <button type="submit">Yuborish</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2 style="font-size:18px;margin-top:0;">Murojaatlar</h2>
+    <div class="filter">
+      <label for="filter" style="margin-top:0;">Holat bo'yicha filtr</label>
+      <select id="filter">
+        <option value="all">Barchasi</option>
+        <option value="Yangi">Yangi</option>
+        <option value="Jarayonda">Jarayonda</option>
+        <option value="Hal qilindi">Hal qilindi</option>
+      </select>
+    </div>
+    <div id="list"></div>
+  </div>
+</div>
+
+<script>
+  const STORAGE_KEY = "chiqindi_murojaatlar";
+  let reports = [];
+
+  // Ma'lumotlarni brauzer xotirasidan yuklash
+  try {
+    reports = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+  } catch (e) {
+    reports = [];
+  }
+
+  function save() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(reports)); } catch (e) {}
+  }
+
+  const statusClass = { "Yangi": "yangi", "Jarayonda": "jarayonda", "Hal qilindi": "hal" };
+
+  function render() {
+    const filter = document.getElementById("filter").value;
+    const list = document.getElementById("list");
+    const items = reports.filter(r => filter === "all" || r.status === filter);
+
+    if (items.length === 0) {
+      list.innerHTML = '<p class="empty">Murojaatlar yo\'q.</p>';
+      return;
+    }
+
+    list.innerHTML = "";
+    items.slice().reverse().forEach(r => {
+      const div = document.createElement("div");
+      div.className = "report " + statusClass[r.status];
+
+      const title = document.createElement("strong");
+      title.textContent = r.address + " — " + r.type;
+      div.appendChild(title);
+
+      const meta = document.createElement("div");
+      meta.className = "meta";
+      meta.textContent = r.date + (r.note ? " · " + r.note : "");
+      div.appendChild(meta);
+
+      if (r.photo) {
+        const img = document.createElement("img");
+        img.className = "thumb";
+        img.src = r.photo;
+        div.appendChild(img);
+      }
+
+      const select = document.createElement("select");
+      select.className = "status-select";
+      ["Yangi", "Jarayonda", "Hal qilindi"].forEach(s => {
+        const opt = document.createElement("option");
+        opt.value = s;
+        opt.textContent = s;
+        if (s === r.status) opt.selected = true;
+        select.appendChild(opt);
+      });
+      select.addEventListener("change", () => {
+        r.status = select.value;
+        save();
+        render();
+      });
+      div.appendChild(select);
+
+      list.appendChild(div);
+    });
+  }
+
+  document.getElementById("form").addEventListener("submit", e => {
+    e.preventDefault();
+    const address = document.getElementById("address").value.trim();
+    const type = document.getElementById("type").value;
+    const note = document.getElementById("note").value.trim();
+    const file = document.getElementById("photo").files[0];
+
+    const add = (photo) => {
+      reports.push({
+        address, type, note, photo,
+        status: "Yangi",
+        date: new Date().toLocaleString("uz-UZ")
+      });
+      save();
+      e.target.reset();
+      render();
+    };
+
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => add(reader.result);
+      reader.readAsDataURL(file);
+    } else {
+      add(null);
+    }
+  });
+
+  document.getElementById("filter").addEventListener("change", render);
+  render();
+</script>
+</body>
+</html>
